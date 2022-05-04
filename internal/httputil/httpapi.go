@@ -65,13 +65,14 @@ func MakeAuthAPI(
 		// add the user to Sentry, if enabled
 		hub := sentry.GetHubFromContext(req.Context())
 		if hub != nil {
+			hub.Scope().SetRequest(req)
 			hub.Scope().SetTag("user_id", device.UserID)
 			hub.Scope().SetTag("device_id", device.ID)
 		}
 		defer func() {
 			if r := recover(); r != nil {
 				if hub != nil {
-					hub.CaptureException(fmt.Errorf("%s panicked", req.URL.Path))
+					hub.Recover(r)
 				}
 				// re-panic to return the 500
 				panic(r)
@@ -82,7 +83,7 @@ func MakeAuthAPI(
 		// do not log 4xx as errors as they are client fails, not server fails
 		if hub != nil && jsonRes.Code >= 500 {
 			hub.Scope().SetExtra("response", jsonRes)
-			hub.CaptureException(fmt.Errorf("%s returned HTTP %d", req.URL.Path, jsonRes.Code))
+			hub.CaptureMessage(fmt.Sprintf("%s returned HTTP %d", req.URL.Path, jsonRes.Code))
 		}
 		return jsonRes
 	}
@@ -244,13 +245,14 @@ func MakeFedAPI(
 		// add the user to Sentry, if enabled
 		hub := sentry.GetHubFromContext(req.Context())
 		if hub != nil {
+			hub.Scope().SetRequest(req)
 			hub.Scope().SetTag("origin", string(fedReq.Origin()))
 			hub.Scope().SetTag("uri", fedReq.RequestURI())
 		}
 		defer func() {
 			if r := recover(); r != nil {
 				if hub != nil {
-					hub.CaptureException(fmt.Errorf("%s panicked", req.URL.Path))
+					hub.Recover(r)
 				}
 				// re-panic to return the 500
 				panic(r)
@@ -266,7 +268,7 @@ func MakeFedAPI(
 		// do not log 4xx as errors as they are client fails, not server fails
 		if hub != nil && jsonRes.Code >= 500 {
 			hub.Scope().SetExtra("response", jsonRes)
-			hub.CaptureException(fmt.Errorf("%s returned HTTP %d", req.URL.Path, jsonRes.Code))
+			hub.CaptureMessage(fmt.Sprintf("%s returned HTTP %d", req.URL.Path, jsonRes.Code))
 		}
 		return jsonRes
 	}
