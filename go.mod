@@ -31,7 +31,7 @@ require (
 	github.com/matrix-org/go-sqlite3-js v0.0.0-20220419092513-28aa791a1c91
 	github.com/matrix-org/gomatrix v0.0.0-20210324163249-be2af5ef2e16
 	github.com/matrix-org/gomatrixserverlib v0.0.0-20220509120958-8d818048c34c
-	github.com/matrix-org/pinecone v0.0.0-20220408153826-2999ea29ed48
+	github.com/matrix-org/pinecone v0.0.0-20220429135232-a8a5b35060bc
 	github.com/matrix-org/util v0.0.0-20200807132607-55161520e1d4
 	github.com/mattn/go-sqlite3 v1.14.10
 	github.com/miekg/dns v1.1.31 // indirect
