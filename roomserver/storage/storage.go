@@ -27,8 +27,8 @@ import (
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-// Open opens a database connection.
-func Open(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
+// NewRoomserverDatabase opens a database connection.
+func NewRoomserverDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions, cache caching.RoomServerCaches) (Database, error) {
 	switch {
 	case dbProperties.ConnectionString.IsSQLite():
 		return sqlite3.Open(base, dbProperties, cache)

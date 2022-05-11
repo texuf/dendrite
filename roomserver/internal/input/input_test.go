@@ -52,7 +52,7 @@ func TestSingleTransactionOnInput(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db, err := storage.Open(
+	db, err := storage.NewRoomserverDatabase(
 		nil,
 		&config.DatabaseOptions{
 			ConnectionString:   "",
