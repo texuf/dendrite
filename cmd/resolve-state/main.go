@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -27,6 +28,7 @@ var roomVersion = flag.String("roomversion", "5", "the room version to parse eve
 func main() {
 	ctx := context.Background()
 	cfg := setup.ParseFlags(true)
+	base := base.NewBaseDendrite(cfg, "ResolveState")
 	args := os.Args[1:]
 
 	fmt.Println("Room version", *roomVersion)
@@ -45,7 +47,7 @@ func main() {
 		panic(err)
 	}
 
-	roomserverDB, err := storage.Open(nil, &cfg.RoomServer.Database, cache)
+	roomserverDB, err := storage.Open(base, &cfg.RoomServer.Database, cache)
 	if err != nil {
 		panic(err)
 	}
