@@ -121,12 +121,17 @@ func main() {
 
 	fmt.Println("Resolved state contains", len(resolved), "events")
 	filteringEventType := *filterType
+	count := 0
 	for _, event := range resolved {
 		if filteringEventType != "" && event.Type() != filteringEventType {
 			continue
 		}
+		count++
 		fmt.Println()
 		fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
 		fmt.Printf("  %s\n", string(event.Content()))
 	}
+
+	fmt.Println()
+	fmt.Println("Returned", count, "state events after filtering")
 }
