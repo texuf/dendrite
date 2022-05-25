@@ -28,7 +28,7 @@ var roomVersion = flag.String("roomversion", "5", "the room version to parse eve
 func main() {
 	ctx := context.Background()
 	cfg := setup.ParseFlags(true)
-	base := base.NewBaseDendrite(cfg, "ResolveState")
+	base := base.NewBaseDendrite(cfg, "ResolveState", base.DisableMetrics)
 	args := os.Args[1:]
 
 	fmt.Println("Room version", *roomVersion)
