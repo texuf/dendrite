@@ -23,6 +23,7 @@ import (
 //   e.g. ./resolve-state --roomversion=5 1254 1235 1282
 
 var roomVersion = flag.String("roomversion", "5", "the room version to parse events as")
+var filterType = flag.String("filtertype", "", "the event types to filter on")
 
 func main() {
 	ctx := context.Background()
@@ -114,7 +115,11 @@ func main() {
 	}
 
 	fmt.Println("Resolved state contains", len(resolved), "events")
+	filteringEventType := *filterType
 	for _, event := range resolved {
+		if filteringEventType != "" && event.Type() != filteringEventType {
+			continue
+		}
 		fmt.Println()
 		fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
 		fmt.Printf("  %s\n", string(event.Content()))
