@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -29,7 +28,7 @@ func main() {
 	ctx := context.Background()
 	cfg := setup.ParseFlags(true)
 	base := base.NewBaseDendrite(cfg, "ResolveState", base.DisableMetrics)
-	args := os.Args[1:]
+	args := flag.Args()
 
 	fmt.Println("Room version", *roomVersion)
 
