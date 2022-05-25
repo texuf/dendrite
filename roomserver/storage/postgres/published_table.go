@@ -52,12 +52,12 @@ type publishedStatements struct {
 	purgePublishedStmt     *sql.Stmt
 }
 
-func createPublishedTable(db *sql.DB) error {
+func CreatePublishedTable(db *sql.DB) error {
 	_, err := db.Exec(publishedSchema)
 	return err
 }
 
-func preparePublishedTable(db *sql.DB) (tables.Published, error) {
+func PreparePublishedTable(db *sql.DB) (tables.Published, error) {
 	s := &publishedStatements{}
 
 	return s, sqlutil.StatementList{
@@ -98,8 +98,8 @@ func (s *publishedStatements) SelectAllPublishedRooms(
 	defer internal.CloseAndLogIfError(ctx, rows, "selectAllPublishedStmt: rows.close() failed")
 
 	var roomIDs []string
+	var roomID string
 	for rows.Next() {
-		var roomID string
 		if err = rows.Scan(&roomID); err != nil {
 			return nil, err
 		}

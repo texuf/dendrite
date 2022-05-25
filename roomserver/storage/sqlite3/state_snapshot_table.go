@@ -71,12 +71,12 @@ type stateSnapshotStatements struct {
 	purgeStateSnapshotForRoomStmt *sql.Stmt
 }
 
-func createStateSnapshotTable(db *sql.DB) error {
+func CreateStateSnapshotTable(db *sql.DB) error {
 	_, err := db.Exec(stateSnapshotSchema)
 	return err
 }
 
-func prepareStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
+func PrepareStateSnapshotTable(db *sql.DB) (tables.StateSnapshot, error) {
 	s := &stateSnapshotStatements{
 		db: db,
 	}
@@ -100,12 +100,10 @@ func (s *stateSnapshotStatements) InsertState(
 		return
 	}
 	insertStmt := sqlutil.TxStmt(txn, s.insertStateStmt)
-	var id int64
-	err = insertStmt.QueryRowContext(ctx, stateBlockNIDs.Hash(), int64(roomNID), string(stateBlockNIDsJSON)).Scan(&id)
+	err = insertStmt.QueryRowContext(ctx, stateBlockNIDs.Hash(), int64(roomNID), string(stateBlockNIDsJSON)).Scan(&stateNID)
 	if err != nil {
 		return 0, err
 	}
-	stateNID = types.StateSnapshotNID(id)
 	return
 }
 
@@ -131,9 +129,9 @@ func (s *stateSnapshotStatements) BulkSelectStateBlockNIDs(
 	defer internal.CloseAndLogIfError(ctx, rows, "bulkSelectStateBlockNIDs: rows.close() failed")
 	results := make([]types.StateBlockNIDList, len(stateNIDs))
 	i := 0
+	var stateBlockNIDsJSON string
 	for ; rows.Next(); i++ {
 		result := &results[i]
-		var stateBlockNIDsJSON string
 		if err := rows.Scan(&result.StateSnapshotNID, &stateBlockNIDsJSON); err != nil {
 			return nil, err
 		}

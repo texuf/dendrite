@@ -65,12 +65,12 @@ type redactionStatements struct {
 	purgeRedactionForRoomStmt                   *sql.Stmt
 }
 
-func createRedactionsTable(db *sql.DB) error {
+func CreateRedactionsTable(db *sql.DB) error {
 	_, err := db.Exec(redactionsSchema)
 	return err
 }
 
-func prepareRedactionsTable(db *sql.DB) (tables.Redactions, error) {
+func PrepareRedactionsTable(db *sql.DB) (tables.Redactions, error) {
 	s := &redactionStatements{}
 
 	return s, sqlutil.StatementList{

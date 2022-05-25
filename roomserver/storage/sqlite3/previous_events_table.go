@@ -75,12 +75,12 @@ type previousEventStatements struct {
 	purgePreviousEventsForRoomStmt *sql.Stmt
 }
 
-func createPrevEventsTable(db *sql.DB) error {
+func CreatePrevEventsTable(db *sql.DB) error {
 	_, err := db.Exec(previousEventSchema)
 	return err
 }
 
-func preparePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
+func PreparePrevEventsTable(db *sql.DB) (tables.PreviousEvents, error) {
 	s := &previousEventStatements{
 		db: db,
 	}

@@ -4,6 +4,10 @@ import (
 	"context"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
+
 	asAPI "github.com/matrix-org/dendrite/appservice/api"
 	fsAPI "github.com/matrix-org/dendrite/federationapi/api"
 	"github.com/matrix-org/dendrite/internal/caching"
@@ -17,9 +21,6 @@ import (
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/setup/process"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 )
 
 // RoomserverInternalAPI is an implementation of api.RoomserverInternalAPI
@@ -36,6 +37,7 @@ type RoomserverInternalAPI struct {
 	*perform.Backfiller
 	*perform.Forgetter
 	*perform.Upgrader
+	*perform.Admin
 	ProcessContext         *process.ProcessContext
 	DB                     storage.Database
 	Cfg                    *config.RoomServer
@@ -43,8 +45,8 @@ type RoomserverInternalAPI struct {
 	ServerName             gomatrixserverlib.ServerName
 	KeyRing                gomatrixserverlib.JSONVerifier
 	ServerACLs             *acls.ServerACLs
-	fsAPI                  fsAPI.FederationInternalAPI
-	asAPI                  asAPI.AppServiceQueryAPI
+	fsAPI                  fsAPI.RoomserverFederationAPI
+	asAPI                  asAPI.AppServiceInternalAPI
 	NATSClient             *nats.Conn
 	JetStream              nats.JetStreamContext
 	Durable                string
@@ -87,7 +89,7 @@ func NewRoomserverAPI(
 // SetFederationInputAPI passes in a federation input API reference so that we can
 // avoid the chicken-and-egg problem of both the roomserver input API and the
 // federation input API being interdependent.
-func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalAPI, keyRing *gomatrixserverlib.KeyRing) {
+func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.RoomserverFederationAPI, keyRing *gomatrixserverlib.KeyRing) {
 	r.fsAPI = fsAPI
 	r.KeyRing = keyRing
 
@@ -168,17 +170,23 @@ func (r *RoomserverInternalAPI) SetFederationAPI(fsAPI fsAPI.FederationInternalA
 		Cfg:    r.Cfg,
 		URSAPI: r,
 	}
+	r.Admin = &perform.Admin{
+		DB:      r.DB,
+		Cfg:     r.Cfg,
+		Inputer: r.Inputer,
+		Queryer: r.Queryer,
+	}
 
 	if err := r.Inputer.Start(); err != nil {
 		logrus.WithError(err).Panic("failed to start roomserver input API")
 	}
 }
 
-func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.UserInternalAPI) {
+func (r *RoomserverInternalAPI) SetUserAPI(userAPI userapi.RoomserverUserAPI) {
 	r.Leaver.UserAPI = userAPI
 }
 
-func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceQueryAPI) {
+func (r *RoomserverInternalAPI) SetAppserviceAPI(asAPI asAPI.AppServiceInternalAPI) {
 	r.asAPI = asAPI
 }
 

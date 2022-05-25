@@ -20,12 +20,13 @@ import (
 	keyapi "github.com/matrix-org/dendrite/keyserver/api"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/tidwall/gjson"
 )
 
 // GetUserDevices for the given user id
 func GetUserDevices(
 	req *http.Request,
-	keyAPI keyapi.KeyInternalAPI,
+	keyAPI keyapi.FederationKeyAPI,
 	userID string,
 ) util.JSONResponse {
 	var res keyapi.QueryDeviceMessagesResponse
@@ -69,9 +70,14 @@ func GetUserDevices(
 			continue
 		}
 
+		displayName := dev.DisplayName
+		if displayName == "" {
+			displayName = gjson.GetBytes(dev.DeviceKeys.KeyJSON, "unsigned.device_display_name").Str
+		}
+
 		device := gomatrixserverlib.RespUserDevice{
 			DeviceID:    dev.DeviceID,
-			DisplayName: dev.DisplayName,
+			DisplayName: displayName,
 			Keys:        key,
 		}
 

@@ -70,7 +70,7 @@ func SendEvent(
 	device *userapi.Device,
 	roomID, eventType string, txnID, stateKey *string,
 	cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 	txnCache *transactions.Cache,
 ) util.JSONResponse {
 	verReq := api.QueryRoomVersionForRoomRequest{RoomID: roomID}
@@ -102,6 +102,13 @@ func SendEvent(
 	resErr := httputil.UnmarshalJSONRequest(req, &r)
 	if resErr != nil {
 		return *resErr
+	}
+
+	// If we're sending a membership update, make sure to strip the authorised
+	// via key if it is present, otherwise other servers won't be able to auth
+	// the event if the room is set to the "restricted" join rule.
+	if eventType == gomatrixserverlib.MRoomMember {
+		delete(r, "join_authorised_via_users_server")
 	}
 
 	evTime, err := httputil.ParseTSParam(req)
@@ -207,7 +214,7 @@ func generateSendEvent(
 	device *userapi.Device,
 	roomID, eventType string, stateKey *string,
 	cfg *config.ClientAPI,
-	rsAPI api.RoomserverInternalAPI,
+	rsAPI api.ClientRoomserverAPI,
 	evTime time.Time,
 ) (*gomatrixserverlib.Event, *util.JSONResponse) {
 	// parse the incoming http request

@@ -18,11 +18,12 @@ import (
 	"github.com/matrix-org/dendrite/internal/sqlutil"
 	"github.com/matrix-org/dendrite/keyserver/storage/shared"
 	"github.com/matrix-org/dendrite/keyserver/storage/sqlite3/deltas"
+	"github.com/matrix-org/dendrite/setup/base"
 	"github.com/matrix-org/dendrite/setup/config"
 )
 
-func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error) {
-	db, err := sqlutil.Open(dbProperties)
+func NewDatabase(base *base.BaseDendrite, dbProperties *config.DatabaseOptions) (*shared.Database, error) {
+	db, writer, err := base.DatabaseConnection(dbProperties, sqlutil.NewExclusiveWriter())
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +54,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 
 	m := sqlutil.NewMigrations()
 	deltas.LoadRefactorKeyChanges(m)
+	deltas.LoadFixCrossSigningSignatureIndexes(m)
 	if err = m.RunDeltas(db, dbProperties); err != nil {
 		return nil, err
 	}
@@ -61,7 +63,7 @@ func NewDatabase(dbProperties *config.DatabaseOptions) (*shared.Database, error)
 	}
 	d := &shared.Database{
 		DB:                    db,
-		Writer:                sqlutil.NewExclusiveWriter(),
+		Writer:                writer,
 		OneTimeKeysTable:      otk,
 		DeviceKeysTable:       dk,
 		KeyChangesTable:       kc,

@@ -72,12 +72,12 @@ type inviteStatements struct {
 	purgeInviteStmt                     *sql.Stmt
 }
 
-func createInvitesTable(db *sql.DB) error {
+func CreateInvitesTable(db *sql.DB) error {
 	_, err := db.Exec(inviteSchema)
 	return err
 }
 
-func prepareInvitesTable(db *sql.DB) (tables.Invites, error) {
+func PrepareInvitesTable(db *sql.DB) (tables.Invites, error) {
 	s := &inviteStatements{
 		db: db,
 	}
@@ -123,8 +123,8 @@ func (s *inviteStatements) UpdateInviteRetired(
 		return
 	}
 	defer internal.CloseAndLogIfError(ctx, rows, "UpdateInviteRetired: rows.close() failed")
+	var inviteEventID string
 	for rows.Next() {
-		var inviteEventID string
 		if err = rows.Scan(&inviteEventID); err != nil {
 			return
 		}
@@ -151,9 +151,9 @@ func (s *inviteStatements) SelectInviteActiveForUserInRoom(
 	defer internal.CloseAndLogIfError(ctx, rows, "selectInviteActiveForUserInRoom: rows.close() failed")
 	var result []types.EventStateKeyNID
 	var eventIDs []string
+	var eventID string
+	var senderUserNID int64
 	for rows.Next() {
-		var eventID string
-		var senderUserNID int64
 		if err := rows.Scan(&eventID, &senderUserNID); err != nil {
 			return nil, nil, err
 		}

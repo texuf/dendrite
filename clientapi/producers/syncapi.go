@@ -20,13 +20,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/matrix-org/gomatrixserverlib"
+	"github.com/nats-io/nats.go"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/matrix-org/dendrite/internal/eventutil"
 	"github.com/matrix-org/dendrite/setup/jetstream"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
-	"github.com/matrix-org/gomatrixserverlib"
-	"github.com/nats-io/nats.go"
-	log "github.com/sirupsen/logrus"
 )
 
 // SyncAPIProducer produces events for the sync API server to consume
@@ -38,7 +39,7 @@ type SyncAPIProducer struct {
 	TopicPresenceEvent     string
 	JetStream              nats.JetStreamContext
 	ServerName             gomatrixserverlib.ServerName
-	UserAPI                userapi.UserInternalAPI
+	UserAPI                userapi.ClientUserAPI
 }
 
 // SendData sends account data to the sync API server

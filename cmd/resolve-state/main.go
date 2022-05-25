@@ -7,11 +7,12 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/matrix-org/gomatrixserverlib"
+
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/storage"
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
-	"github.com/matrix-org/gomatrixserverlib"
 )
 
 // This is a utility for inspecting state snapshots and running state resolution
@@ -45,7 +46,7 @@ func main() {
 		panic(err)
 	}
 
-	roomserverDB, err := storage.Open(&cfg.RoomServer.Database, cache)
+	roomserverDB, err := storage.Open(nil, &cfg.RoomServer.Database, cache)
 	if err != nil {
 		panic(err)
 	}
