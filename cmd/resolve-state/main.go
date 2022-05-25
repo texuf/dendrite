@@ -11,6 +11,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/dendrite/setup"
 	"github.com/matrix-org/dendrite/setup/base"
+	"github.com/matrix-org/dendrite/setup/config"
 	"github.com/matrix-org/gomatrixserverlib"
 )
 
@@ -28,6 +29,10 @@ var filterType = flag.String("filtertype", "", "the event types to filter on")
 func main() {
 	ctx := context.Background()
 	cfg := setup.ParseFlags(true)
+	cfg.Logging = append(cfg.Logging[:0], config.LogrusHook{
+		Type:  "std",
+		Level: "error",
+	})
 	base := base.NewBaseDendrite(cfg, "ResolveState", base.DisableMetrics)
 	args := flag.Args()
 
