@@ -28,6 +28,7 @@ import (
 
 var roomVersion = flag.String("roomversion", "5", "the room version to parse events as")
 var filterType = flag.String("filtertype", "", "the event types to filter on")
+var difference = flag.Bool("difference", false, "whether to calculate the difference between snapshots")
 
 func main() {
 	ctx := context.Background()
@@ -63,6 +64,48 @@ func main() {
 	stateres := state.NewStateResolution(roomserverDB, &types.RoomInfo{
 		RoomVersion: gomatrixserverlib.RoomVersion(*roomVersion),
 	})
+
+	if *difference {
+		if len(snapshotNIDs) != 2 {
+			panic("need exactly two state snapshot NIDs to calculate difference")
+		}
+
+		removed, added, err := stateres.DifferenceBetweeenStateSnapshots(ctx, snapshotNIDs[0], snapshotNIDs[1])
+		if err != nil {
+			panic(err)
+		}
+
+		var eventNIDs []types.EventNID
+		for _, entry := range append(removed, added...) {
+			eventNIDs = append(eventNIDs, entry.EventNID)
+		}
+
+		eventEntries, err := roomserverDB.Events(ctx, eventNIDs)
+		if err != nil {
+			panic(err)
+		}
+
+		events := make(map[types.EventNID]*gomatrixserverlib.Event, len(eventEntries))
+		for _, entry := range eventEntries {
+			events[entry.EventNID] = entry.Event
+		}
+
+		fmt.Println("Removed:")
+		for _, r := range removed {
+			event := events[r.EventNID]
+			fmt.Println()
+			fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+			fmt.Printf("  %s\n", string(event.Content()))
+		}
+
+		fmt.Println("Added:")
+		for _, a := range added {
+			event := events[a.EventNID]
+			fmt.Println()
+			fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+			fmt.Printf("  %s\n", string(event.Content()))
+		}
+	}
 
 	var stateEntries []types.StateEntry
 	for _, snapshotNID := range snapshotNIDs {
