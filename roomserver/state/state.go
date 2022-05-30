@@ -74,10 +74,6 @@ func (v *StateResolution) LoadStateAtSnapshot(
 	}
 	stateEntriesMap := stateEntryListMap(stateEntryLists)
 
-	fmt.Println("Loading state snapshot", stateNID)
-	fmt.Println("State block NIDs:", stateBlockNIDList)
-	fmt.Println("State entry lists:", stateEntryLists)
-
 	// Combine all the state entries for this snapshot.
 	// The order of state block NIDs in the list tells us the order to combine them in.
 	var fullState []types.StateEntry
@@ -91,15 +87,11 @@ func (v *StateResolution) LoadStateAtSnapshot(
 		fullState = append(fullState, entries...)
 	}
 
-	fmt.Println("Full state before stable sort:", fullState)
-
 	// Stable sort so that the most recent entry for each state key stays
 	// remains later in the list than the older entries for the same state key.
 	sort.Stable(stateEntryByStateKeySorter(fullState))
-	fmt.Println("Full state before unique:", fullState)
 	// Unique returns the last entry and hence the most recent entry for each state key.
 	fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
-	fmt.Println("Full state after unique:", fullState)
 	return fullState, nil
 }
 
