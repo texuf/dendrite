@@ -98,6 +98,7 @@ func main() {
 			fmt.Printf("  %s\n", string(event.Content()))
 		}
 
+		fmt.Println()
 		fmt.Println("Added:")
 		for _, a := range added {
 			event := events[a.EventNID]
@@ -105,6 +106,8 @@ func main() {
 			fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
 			fmt.Printf("  %s\n", string(event.Content()))
 		}
+
+		return
 	}
 
 	var stateEntries []types.StateEntry
