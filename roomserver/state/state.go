@@ -87,11 +87,14 @@ func (v *StateResolution) LoadStateAtSnapshot(
 		fullState = append(fullState, entries...)
 	}
 
+	fmt.Println("Before stable sort:", len(fullState), "->", fullState)
 	// Stable sort so that the most recent entry for each state key stays
 	// remains later in the list than the older entries for the same state key.
 	sort.Stable(stateEntryByStateKeySorter(fullState))
+	fmt.Println("Before unique sort:", len(fullState), "->", fullState)
 	// Unique returns the last entry and hence the most recent entry for each state key.
 	fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
+	fmt.Println("Before final return:", len(fullState), "->", fullState)
 	return fullState, nil
 }
 

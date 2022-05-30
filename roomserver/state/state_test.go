@@ -22,6 +22,68 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 )
 
+func TestDifferenceBetweeenStateSnapshots(t *testing.T) {
+	oldEntries := []types.StateEntry{
+		{
+			StateKeyTuple: types.StateKeyTuple{EventTypeNID: 1, EventStateKeyNID: 1},
+			EventNID:      1,
+		},
+		{
+			StateKeyTuple: types.StateKeyTuple{EventTypeNID: 1, EventStateKeyNID: 1},
+			EventNID:      1,
+		},
+	}
+	newEntries := []types.StateEntry{
+		{
+			StateKeyTuple: types.StateKeyTuple{EventTypeNID: 1, EventStateKeyNID: 1},
+			EventNID:      2,
+		},
+		{
+			StateKeyTuple: types.StateKeyTuple{EventTypeNID: 2, EventStateKeyNID: 2},
+			EventNID:      2,
+		},
+		{
+			StateKeyTuple: types.StateKeyTuple{EventTypeNID: 2, EventStateKeyNID: 2},
+			EventNID:      2,
+		},
+	}
+
+	var removed, added []types.StateEntry
+	func() {
+		var oldI int
+		var newI int
+		for {
+			switch {
+			case oldI == len(oldEntries):
+				// We've reached the end of the old entries.
+				// The rest of the new list must have been newly added.
+				added = append(added, newEntries[newI:]...)
+				return
+			case newI == len(newEntries):
+				// We've reached the end of the new entries.
+				// The rest of the old list must be have been removed.
+				removed = append(removed, oldEntries[oldI:]...)
+				return
+			case oldEntries[oldI] == newEntries[newI]:
+				// The entry is in both lists so skip over it.
+				oldI++
+				newI++
+			case oldEntries[oldI].LessThan(newEntries[newI]):
+				// The lists are sorted so the old entry being less than the new entry means that it only appears in the old list.
+				removed = append(removed, oldEntries[oldI])
+				oldI++
+			default:
+				// Reaching the default case implies that the new entry is less than the old entry.
+				// Since the lists are sorted this means that it only appears in the new list.
+				added = append(added, newEntries[newI])
+				newI++
+			}
+		}
+	}()
+	t.Log("Added:", added)
+	t.Log("Removed:", removed)
+}
+
 func TestFindDuplicateStateKeys(t *testing.T) {
 	testCases := []struct {
 		Input []types.StateEntry
