@@ -176,13 +176,17 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 			// If the prev event was a state event then add an entry for the event itself
 			// so that we get the state after the event rather than the state before.
 			fullState = append(fullState, prevState.StateEntry)
+			fmt.Println("State event:", prevState)
 		}
 
 		// Stable sort so that the most recent entry for each state key stays
 		// remains later in the list than the older entries for the same state key.
+		fmt.Println("Full state before stable sort:", fullState)
 		sort.Stable(stateEntryByStateKeySorter(fullState))
+		fmt.Println("Full state after stable sort:", fullState)
 		// Unique returns the last entry and hence the most recent entry for each state key.
 		fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
+		fmt.Println("Full state after unique:", fullState)
 		// Add the full state for this StateSnapshotNID.
 		combined = append(combined, fullState...)
 	}
@@ -659,15 +663,13 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 	}
 
 	// Collect all the entries with the same type and key together.
-	// We don't care about the order here because the conflict resolution
-	// algorithm doesn't depend on the order of the prev events.
-	// Remove duplicate entires.
+	// This is done so findDuplicateStateKeys can work in groups.
+	// We remove duplicates (same type, state key and event NID) too.
 	combined = combined[:util.SortAndUnique(stateEntrySorter(combined))]
 
 	// Find the conflicts
-	conflicts := findDuplicateStateKeys(combined)
-
-	if len(conflicts) > 0 {
+	if conflicts := findDuplicateStateKeys(combined); len(conflicts) > 0 {
+		conflictMap := stateEntryMap(conflicts)
 		conflictLength = len(conflicts)
 
 		// 5) There are conflicting state events, for each conflict workout
@@ -676,7 +678,7 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 		// Work out which entries aren't conflicted.
 		var notConflicted []types.StateEntry
 		for _, entry := range combined {
-			if _, ok := stateEntryMap(conflicts).lookup(entry.StateKeyTuple); !ok {
+			if _, ok := conflictMap.lookup(entry.StateKeyTuple); !ok {
 				notConflicted = append(notConflicted, entry)
 			}
 		}
@@ -689,7 +691,7 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 			return
 		}
 		algorithm = "full_state_with_conflicts"
-		state = resolved[:util.SortAndUnique(stateEntrySorter(resolved))]
+		state = resolved
 	} else {
 		algorithm = "full_state_no_conflicts"
 		// 6) There weren't any conflicts
