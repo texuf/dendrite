@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -74,6 +75,10 @@ func (v *StateResolution) LoadStateAtSnapshot(
 	}
 	stateEntriesMap := stateEntryListMap(stateEntryLists)
 
+	logrus.Print("Loading state snapshot", stateNID)
+	logrus.Println("State block NIDs:", stateBlockNIDList)
+	logrus.Println("State entry lists:", stateEntryLists)
+
 	// Combine all the state entries for this snapshot.
 	// The order of state block NIDs in the list tells us the order to combine them in.
 	var fullState []types.StateEntry
@@ -87,11 +92,15 @@ func (v *StateResolution) LoadStateAtSnapshot(
 		fullState = append(fullState, entries...)
 	}
 
+	logrus.Println("Full state before stable sort:", fullState)
+
 	// Stable sort so that the most recent entry for each state key stays
 	// remains later in the list than the older entries for the same state key.
 	sort.Stable(stateEntryByStateKeySorter(fullState))
+	logrus.Println("Full state before unique:", fullState)
 	// Unique returns the last entry and hence the most recent entry for each state key.
 	fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
+	logrus.Println("Full state after unique:", fullState)
 	return fullState, nil
 }
 
