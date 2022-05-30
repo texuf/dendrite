@@ -90,21 +90,28 @@ func main() {
 			events[entry.EventNID] = entry.Event
 		}
 
-		fmt.Println("Removed:")
-		for _, r := range removed {
-			event := events[r.EventNID]
-			fmt.Println()
-			fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
-			fmt.Printf("  %s\n", string(event.Content()))
+		if len(removed) > 0 {
+			fmt.Println("Removed:")
+			for _, r := range removed {
+				event := events[r.EventNID]
+				fmt.Println()
+				fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+				fmt.Printf("  %s\n", string(event.Content()))
+			}
 		}
 
-		fmt.Println()
-		fmt.Println("Added:")
-		for _, a := range added {
-			event := events[a.EventNID]
+		if len(removed) > 0 && len(added) > 0 {
 			fmt.Println()
-			fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
-			fmt.Printf("  %s\n", string(event.Content()))
+		}
+
+		if len(added) > 0 {
+			fmt.Println("Added:")
+			for _, a := range added {
+				event := events[a.EventNID]
+				fmt.Println()
+				fmt.Printf("* %s %s %q\n", event.EventID(), event.Type(), *event.StateKey())
+				fmt.Printf("  %s\n", string(event.Content()))
+			}
 		}
 
 		return
