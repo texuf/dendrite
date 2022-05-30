@@ -180,15 +180,15 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 			}
 			fullState = append(fullState, entries...)
 		}
+		if prevState.IsStateEvent() && !prevState.IsRejected {
+			// If the prev event was a state event then add an entry for the event itself
+			// so that we get the state after the event rather than the state before.
+			fullState = append(fullState, prevState.StateEntry)
+		}
 
 		// Stable sort so that the most recent entry for each state key stays
 		// remains later in the list than the older entries for the same state key.
 		sort.Stable(stateEntryByStateKeySorter(fullState))
-		// If the prev event was a state event then add an entry for the event itself
-		// so that we get the state after the event rather than the state before.
-		if prevState.IsStateEvent() && !prevState.IsRejected {
-			fullState = append(fullState, prevState.StateEntry)
-		}
 		// Unique returns the last entry and hence the most recent entry for each state key.
 		fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
 		// Add the full state for this StateSnapshotNID.
