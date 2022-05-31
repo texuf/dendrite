@@ -921,6 +921,8 @@ func (v *StateResolution) resolveConflictsV2(
 		authDifference,
 	)
 
+	v.logf("Resolved v2: %+v", resolvedEvents)
+
 	// Map from the full events back to numeric state entries.
 	for _, resolvedEvent := range resolvedEvents {
 		entry, ok := eventIDMap[resolvedEvent.EventID()]
@@ -930,8 +932,11 @@ func (v *StateResolution) resolveConflictsV2(
 		notConflicted = append(notConflicted, entry)
 	}
 
+	v.logf("New not conflicted: %+v", notConflicted)
+
 	// Sort the result so it can be searched.
 	sort.Sort(stateEntrySorter(notConflicted))
+	v.logf("New not conflicted sorted: %+v", notConflicted)
 	return notConflicted, nil
 }
 
