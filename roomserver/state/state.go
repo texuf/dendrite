@@ -25,7 +25,6 @@ import (
 
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -559,7 +558,7 @@ func (v *StateResolution) logf(f string, ff ...interface{}) {
 	if v.roomInfo.RoomNID != 97 {
 		return
 	}
-	logrus.WithField("room_nid", v.roomInfo.RoomNID).Errorf("XXX: "+f, ff...)
+	fmt.Printf(f+"\n", ff...)
 }
 
 // CalculateAndStoreStateAfterEvents finds the room state after the given events.
@@ -901,26 +900,26 @@ func (v *StateResolution) resolveConflictsV2(
 
 	var conflictedStr, nonConflictedStr, authEventsStr, authDifferenceStr, resolvedStr []string
 	for _, ev := range conflictedEvents {
-		conflictedStr = append(conflictedStr, fmt.Sprintf("{%s, %s -> %s}", ev.Type(), *ev.StateKey(), string(ev.Content())))
+		conflictedStr = append(conflictedStr, "`"+string(ev.JSON())+"`")
 	}
 	for _, ev := range nonConflictedEvents {
-		nonConflictedStr = append(nonConflictedStr, fmt.Sprintf("{%s, %s -> %s}", ev.Type(), *ev.StateKey(), string(ev.Content())))
+		nonConflictedStr = append(nonConflictedStr, "`"+string(ev.JSON())+"`")
 	}
 	for _, ev := range authEvents {
-		authEventsStr = append(authEventsStr, fmt.Sprintf("{%s, %s -> %s}", ev.Type(), *ev.StateKey(), string(ev.Content())))
+		authEventsStr = append(authEventsStr, "`"+string(ev.JSON())+"`")
 	}
 	for _, ev := range authDifference {
-		authDifferenceStr = append(authDifferenceStr, fmt.Sprintf("{%s, %s -> %s}", ev.Type(), *ev.StateKey(), string(ev.Content())))
+		authDifferenceStr = append(authDifferenceStr, "`"+string(ev.JSON())+"`")
 	}
 	for _, ev := range resolvedEvents {
-		resolvedStr = append(resolvedStr, fmt.Sprintf("{%s, %s -> %s}", ev.Type(), *ev.StateKey(), string(ev.Content())))
+		resolvedStr = append(resolvedStr, "`"+string(ev.JSON())+"`")
 	}
 
-	v.logf("Conflicted: %s", strings.Join(conflictedStr, ", "))
-	v.logf("Non-conflicted: %s", strings.Join(nonConflictedStr, ", "))
-	v.logf("Auth events: %s", strings.Join(authEventsStr, ", "))
-	v.logf("Auth difference: %s", strings.Join(authDifferenceStr, ", "))
-	v.logf("Resolved: %s", strings.Join(resolvedStr, ", "))
+	v.logf("conflicted := []string{%s}", strings.Join(conflictedStr, ", "))
+	v.logf("nonConflicted := []string{%s}", strings.Join(nonConflictedStr, ", "))
+	v.logf("authEvents := []string{%s}", strings.Join(authEventsStr, ", "))
+	v.logf("authDifference := []string{%s}", strings.Join(authDifferenceStr, ", "))
+	v.logf("resolved := []string{%s}", strings.Join(resolvedStr, ", "))
 
 	// Map from the full events back to numeric state entries.
 	for _, resolvedEvent := range resolvedEvents {
