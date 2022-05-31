@@ -567,7 +567,7 @@ func (v *StateResolution) CalculateAndStoreStateAfterEvents(
 	prevStates []types.StateAtEvent,
 ) (types.StateSnapshotNID, error) {
 	metrics := calculateStateMetrics{startTime: time.Now(), prevEventLength: len(prevStates)}
-	v.logf("prevStates:", prevStates)
+	v.logf("prevStates: %+v", prevStates)
 
 	if len(prevStates) == 0 {
 		// 2) There weren't any prev_events for this event so the state is
@@ -667,18 +667,18 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 		return
 	}
 
-	v.logf("Combined state after events:", combined)
+	v.logf("Combined state after events: %+v", combined)
 
 	// Collect all the entries with the same type and key together.
 	// This is done so findDuplicateStateKeys can work in groups.
 	// We remove duplicates (same type, state key and event NID) too.
 	combined = combined[:util.SortAndUnique(stateEntrySorter(combined))]
 
-	v.logf("Combined state after sort&unique:", combined)
+	v.logf("Combined state after sort&unique: %+v", combined)
 
 	// Find the conflicts
 	if conflicts := findDuplicateStateKeys(combined); len(conflicts) > 0 {
-		v.logf("Conflicts:", conflicts)
+		v.logf("Conflicts: %+v", conflicts)
 
 		conflictMap := stateEntryMap(conflicts)
 		conflictLength = len(conflicts)
