@@ -24,6 +24,7 @@ import (
 
 	"github.com/matrix-org/util"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -579,6 +580,7 @@ func (v *StateResolution) CalculateAndStoreStateAfterEvents(
 	}
 
 	if len(prevStates) == 1 {
+		logrus.WithField("room_nid", v.roomInfo.RoomNID).Infof("XXX: Hit prevStates == 1")
 		prevState := prevStates[0]
 		if prevState.EventStateKeyNID == 0 || prevState.IsRejected {
 			// 3) None of the previous events were state events and they all
@@ -665,13 +667,19 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 		return
 	}
 
+	logrus.WithField("room_nid", v.roomInfo.RoomNID).Infof("XXX: Combined state after events:", combined)
+
 	// Collect all the entries with the same type and key together.
 	// This is done so findDuplicateStateKeys can work in groups.
 	// We remove duplicates (same type, state key and event NID) too.
 	combined = combined[:util.SortAndUnique(stateEntrySorter(combined))]
 
+	logrus.WithField("room_nid", v.roomInfo.RoomNID).Infof("XXX: Combined state after sort&unique:", combined)
+
 	// Find the conflicts
 	if conflicts := findDuplicateStateKeys(combined); len(conflicts) > 0 {
+		logrus.WithField("room_nid", v.roomInfo.RoomNID).Infof("XXX: Conflicts:", conflicts)
+
 		conflictMap := stateEntryMap(conflicts)
 		conflictLength = len(conflicts)
 
@@ -696,6 +704,7 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 		algorithm = "full_state_with_conflicts"
 		state = resolved
 	} else {
+		logrus.WithField("room_nid", v.roomInfo.RoomNID).Infof("XXX: No conflicts")
 		algorithm = "full_state_no_conflicts"
 		// 6) There weren't any conflicts
 		state = combined
