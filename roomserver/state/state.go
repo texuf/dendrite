@@ -557,7 +557,7 @@ func (v *StateResolution) logf(f string, ff ...interface{}) {
 	if v.roomInfo.RoomNID != 6787 {
 		return
 	}
-	logrus.WithField("room_nid", v.roomInfo.RoomNID).Printf("XXX: "+f, ff...)
+	logrus.WithField("room_nid", v.roomInfo.RoomNID).Errorf("XXX: "+f, ff...)
 }
 
 // CalculateAndStoreStateAfterEvents finds the room state after the given events.
