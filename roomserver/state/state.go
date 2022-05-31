@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/matrix-org/util"
@@ -921,7 +922,28 @@ func (v *StateResolution) resolveConflictsV2(
 		authDifference,
 	)
 
-	v.logf("Resolved v2: %+v", resolvedEvents)
+	var conflictedStr, nonConflictedStr, authEventsStr, authDifferenceStr, resolvedStr []string
+	for _, ev := range conflictedEvents {
+		conflictedStr = append(conflictedStr, fmt.Sprintf("{%s, %s -> %s}", ev.Type(), *ev.StateKey(), string(ev.Content())))
+	}
+	for _, ev := range nonConflictedEvents {
+		nonConflictedStr = append(nonConflictedStr, fmt.Sprintf("{%s, %s -> %s}", ev.Type(), *ev.StateKey(), string(ev.Content())))
+	}
+	for _, ev := range authEvents {
+		authEventsStr = append(authEventsStr, fmt.Sprintf("{%s, %s -> %s}", ev.Type(), *ev.StateKey(), string(ev.Content())))
+	}
+	for _, ev := range authDifference {
+		authDifferenceStr = append(authDifferenceStr, fmt.Sprintf("{%s, %s -> %s}", ev.Type(), *ev.StateKey(), string(ev.Content())))
+	}
+	for _, ev := range resolvedEvents {
+		resolvedStr = append(resolvedStr, fmt.Sprintf("{%s, %s -> %s}", ev.Type(), *ev.StateKey(), string(ev.Content())))
+	}
+
+	v.logf("Conflicted: %s", strings.Join(conflictedStr, ", "))
+	v.logf("Non-conflicted: %s", strings.Join(nonConflictedStr, ", "))
+	v.logf("Auth events: %s", strings.Join(authEventsStr, ", "))
+	v.logf("Auth difference: %s", strings.Join(authDifferenceStr, ", "))
+	v.logf("Resolved: %s", strings.Join(resolvedStr, ", "))
 
 	// Map from the full events back to numeric state entries.
 	for _, resolvedEvent := range resolvedEvents {
@@ -936,7 +958,6 @@ func (v *StateResolution) resolveConflictsV2(
 
 	// Sort the result so it can be searched.
 	sort.Sort(stateEntrySorter(notConflicted))
-	v.logf("New not conflicted sorted: %+v", notConflicted)
 	return notConflicted, nil
 }
 
