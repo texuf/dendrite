@@ -703,6 +703,8 @@ func (v *StateResolution) calculateStateAfterManyEvents(
 		}
 		algorithm = "full_state_with_conflicts"
 		state = resolved
+
+		v.logf("Resolved: %+v", resolved)
 	} else {
 		v.logf("No conflicts")
 		algorithm = "full_state_no_conflicts"
