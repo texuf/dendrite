@@ -554,7 +554,7 @@ func (v *StateResolution) CalculateAndStoreStateBeforeEvent(
 }
 
 func (v *StateResolution) logf(f string, ff ...interface{}) {
-	if v.roomInfo.RoomNID != 6787 {
+	if v.roomInfo.RoomNID != 97 {
 		return
 	}
 	logrus.WithField("room_nid", v.roomInfo.RoomNID).Errorf("XXX: "+f, ff...)
