@@ -88,14 +88,11 @@ func (v *StateResolution) LoadStateAtSnapshot(
 		fullState = append(fullState, entries...)
 	}
 
-	fmt.Println("Before stable sort:", len(fullState), "->", fullState)
 	// Stable sort so that the most recent entry for each state key stays
 	// remains later in the list than the older entries for the same state key.
 	sort.Stable(stateEntryByStateKeySorter(fullState))
-	fmt.Println("Before unique sort:", len(fullState), "->", fullState)
 	// Unique returns the last entry and hence the most recent entry for each state key.
 	fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
-	fmt.Println("Before final return:", len(fullState), "->", fullState)
 	return fullState, nil
 }
 
@@ -180,17 +177,13 @@ func (v *StateResolution) LoadCombinedStateAfterEvents(
 			// If the prev event was a state event then add an entry for the event itself
 			// so that we get the state after the event rather than the state before.
 			fullState = append(fullState, prevState.StateEntry)
-			fmt.Println("State event:", prevState)
 		}
 
 		// Stable sort so that the most recent entry for each state key stays
 		// remains later in the list than the older entries for the same state key.
-		fmt.Println("Full state before stable sort:", fullState)
 		sort.Stable(stateEntryByStateKeySorter(fullState))
-		fmt.Println("Full state after stable sort:", fullState)
 		// Unique returns the last entry and hence the most recent entry for each state key.
 		fullState = fullState[:util.Unique(stateEntryByStateKeySorter(fullState))]
-		fmt.Println("Full state after unique:", fullState)
 		// Add the full state for this StateSnapshotNID.
 		combined = append(combined, fullState...)
 	}
