@@ -992,7 +992,6 @@ func (v *StateResolution) loadAuthEvents(
 			}
 			lookup = append(lookup, authEventID)
 		}
-		lookup = util.UniqueStrings(lookup)
 		if len(lookup) == 0 {
 			break
 		}
@@ -1005,6 +1004,9 @@ func (v *StateResolution) loadAuthEvents(
 			eventMap[event.EventID()] = struct{}{}
 			authEvents = append(authEvents, event)
 			for _, authEventID := range event.AuthEventIDs() {
+				if _, ok := eventMap[authEventID]; ok {
+					continue
+				}
 				add[authEventID] = struct{}{}
 			}
 			for authEventID := range add {
