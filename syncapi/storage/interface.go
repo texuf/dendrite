@@ -157,6 +157,10 @@ type Database interface {
 
 	IgnoresForUser(ctx context.Context, userID string) (*types.IgnoredUsers, error)
 	UpdateIgnoresForUser(ctx context.Context, userID string, ignores *types.IgnoredUsers) error
+
+	SelectRoomVisibilities(ctx context.Context, roomID string) ([]gomatrixserverlib.HeaderedEvent, error)
+	SelectMembershipEventsForUser(ctx context.Context, roomID string, userID string) ([]gomatrixserverlib.HeaderedEvent, error)
+	SelectTopologicalEvent(ctx context.Context, topologicalPosition int, eventType, roomID string, userID *string) (gomatrixserverlib.HeaderedEvent, types.TopologyToken, error)
 }
 
 type Presence interface {

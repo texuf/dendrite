@@ -10,6 +10,7 @@ import (
 
 	"github.com/matrix-org/dendrite/internal/caching"
 	roomserverAPI "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/types"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -120,6 +121,21 @@ func (p *PDUStreamProvider) CompleteSync(
 
 			reqMutex.Lock()
 			defer reqMutex.Unlock()
+			var allowedEvents []gomatrixserverlib.ClientEvent
+			for _, ev := range jr.Timeline.Events {
+				if internal.RoomVisibilities(ctx, p.DB, roomID, req.Device.UserID, ev.EventID) {
+					allowedEvents = append(allowedEvents, ev)
+				}
+			}
+			jr.Timeline.Events = allowedEvents
+			var allowedState []gomatrixserverlib.ClientEvent
+			for _, ev := range jr.State.Events {
+				if internal.RoomVisibilities(ctx, p.DB, roomID, req.Device.UserID, ev.EventID) {
+					allowedState = append(allowedState, ev)
+				}
+			}
+			jr.State.Events = allowedState
+
 			req.Response.Rooms.Join[roomID] = *jr
 			req.Rooms[roomID] = gomatrixserverlib.Join
 		})

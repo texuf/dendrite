@@ -1067,3 +1067,15 @@ func (s *Database) PresenceAfter(ctx context.Context, after types.StreamPosition
 func (s *Database) MaxStreamPositionForPresence(ctx context.Context) (types.StreamPosition, error) {
 	return s.Presence.GetMaxPresenceID(ctx, nil)
 }
+
+func (s *Database) SelectRoomVisibilities(ctx context.Context, roomID string) ([]gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.SelectRoomVisibilities(ctx, nil, roomID)
+}
+
+func (s *Database) SelectMembershipEventsForUser(ctx context.Context, roomID string, userID string) ([]gomatrixserverlib.HeaderedEvent, error) {
+	return s.OutputEvents.SelectMembershipEventsForUser(ctx, nil, roomID, userID)
+}
+
+func (s *Database) SelectTopologicalEvent(ctx context.Context, topologicalPosition int, eventType, roomID string, userID *string) (gomatrixserverlib.HeaderedEvent, types.TopologyToken, error) {
+	return s.OutputEvents.SelectTopologicalEvent(ctx, nil, topologicalPosition, eventType, roomID, userID)
+}

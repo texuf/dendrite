@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/clientapi/jsonerror"
 	"github.com/matrix-org/dendrite/internal/caching"
 	roomserver "github.com/matrix-org/dendrite/roomserver/api"
+	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	userapi "github.com/matrix-org/dendrite/userapi/api"
 	"github.com/matrix-org/gomatrixserverlib"
@@ -135,8 +136,21 @@ func Context(
 		return jsonerror.InternalServerError()
 	}
 
-	eventsBeforeClient := gomatrixserverlib.HeaderedToClientEvents(eventsBefore, gomatrixserverlib.FormatAll)
-	eventsAfterClient := gomatrixserverlib.HeaderedToClientEvents(eventsAfter, gomatrixserverlib.FormatAll)
+	var eventsBeforeNew, eventsAfterNew []*gomatrixserverlib.HeaderedEvent
+	for _, ev := range eventsAfter {
+		if internal.RoomVisibilities(ctx, syncDB, roomID, device.UserID, ev.EventID()) {
+			eventsAfterNew = append(eventsAfterNew, ev)
+		}
+	}
+	for _, ev := range eventsBefore {
+		if internal.RoomVisibilities(ctx, syncDB, roomID, device.UserID, ev.EventID()) {
+			eventsBeforeNew = append(eventsBeforeNew, ev)
+		}
+	}
+	logrus.Debugf("Events: %d vs %d | %d vs %d", len(eventsBefore), len(eventsBeforeNew), len(eventsAfter), len(eventsAfterNew))
+
+	eventsBeforeClient := gomatrixserverlib.HeaderedToClientEvents(eventsBeforeNew, gomatrixserverlib.FormatAll)
+	eventsAfterClient := gomatrixserverlib.HeaderedToClientEvents(eventsAfterNew, gomatrixserverlib.FormatAll)
 	newState := applyLazyLoadMembers(device, filter, eventsAfterClient, eventsBeforeClient, state, lazyLoadCache)
 
 	response := ContextRespsonse{

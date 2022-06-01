@@ -67,6 +67,9 @@ type Events interface {
 	SelectContextEvent(ctx context.Context, txn *sql.Tx, roomID, eventID string) (int, gomatrixserverlib.HeaderedEvent, error)
 	SelectContextBeforeEvent(ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) ([]*gomatrixserverlib.HeaderedEvent, error)
 	SelectContextAfterEvent(ctx context.Context, txn *sql.Tx, id int, roomID string, filter *gomatrixserverlib.RoomEventFilter) (int, []*gomatrixserverlib.HeaderedEvent, error)
+	SelectRoomVisibilities(ctx context.Context, txn *sql.Tx, roomID string) ([]gomatrixserverlib.HeaderedEvent, error)
+	SelectMembershipEventsForUser(ctx context.Context, txn *sql.Tx, roomID string, userID string) ([]gomatrixserverlib.HeaderedEvent, error)
+	SelectTopologicalEvent(ctx context.Context, txn *sql.Tx, topologicalPosition int, eventType, roomID string, userID *string) (gomatrixserverlib.HeaderedEvent, types.TopologyToken, error)
 }
 
 // Topology keeps track of the depths and stream positions for all events.

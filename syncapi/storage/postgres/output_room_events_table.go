@@ -164,20 +164,45 @@ const selectContextAfterEventSQL = "" +
 	" AND ( $7::text[] IS NULL OR NOT(type LIKE ANY($7)) )" +
 	" ORDER BY id ASC LIMIT $3"
 
+const selectRoomVisibilitiesSQL = "" +
+	"SELECT headered_event_json FROM syncapi_output_room_events WHERE type = 'm.room.history_visibility' AND room_id = $1"
+
+const selectMembershipEventsSQL = "" +
+	"SELECT headered_event_json FROM syncapi_output_room_events WHERE type = 'm.room.member' AND room_id = $1 AND sender = $2"
+
+const selectTopologicalEventSQL = "" +
+	"SELECT se.headered_event_json, st.topological_position, st.stream_position " +
+	" FROM syncapi_output_room_events_topology st " +
+	" JOIN syncapi_output_room_events se ON se.event_id = st.event_id " +
+	" WHERE st.room_id = $1 AND st.topological_position < $2 AND se.type = $3 " +
+	" ORDER BY st.topological_position DESC LIMIT 1"
+
+const selectTopologicalMembershipEventSQL = "" +
+	"SELECT se.headered_event_json, st.topological_position, st.stream_position " +
+	" FROM syncapi_output_room_events_topology st " +
+	" JOIN syncapi_output_room_events se ON se.event_id = st.event_id " +
+	" WHERE st.room_id = $1 AND st.topological_position < $2 AND se.type = $3 " +
+	" AND se.sender = $4 " +
+	" ORDER BY st.topological_position DESC LIMIT 1"
+
 type outputRoomEventsStatements struct {
-	insertEventStmt               *sql.Stmt
-	selectEventsStmt              *sql.Stmt
-	selectEventsWitFilterStmt     *sql.Stmt
-	selectMaxEventIDStmt          *sql.Stmt
-	selectRecentEventsStmt        *sql.Stmt
-	selectRecentEventsForSyncStmt *sql.Stmt
-	selectEarlyEventsStmt         *sql.Stmt
-	selectStateInRangeStmt        *sql.Stmt
-	updateEventJSONStmt           *sql.Stmt
-	deleteEventsForRoomStmt       *sql.Stmt
-	selectContextEventStmt        *sql.Stmt
-	selectContextBeforeEventStmt  *sql.Stmt
-	selectContextAfterEventStmt   *sql.Stmt
+	insertEventStmt                      *sql.Stmt
+	selectEventsStmt                     *sql.Stmt
+	selectEventsWitFilterStmt            *sql.Stmt
+	selectMaxEventIDStmt                 *sql.Stmt
+	selectRecentEventsStmt               *sql.Stmt
+	selectRecentEventsForSyncStmt        *sql.Stmt
+	selectEarlyEventsStmt                *sql.Stmt
+	selectStateInRangeStmt               *sql.Stmt
+	updateEventJSONStmt                  *sql.Stmt
+	deleteEventsForRoomStmt              *sql.Stmt
+	selectContextEventStmt               *sql.Stmt
+	selectContextBeforeEventStmt         *sql.Stmt
+	selectContextAfterEventStmt          *sql.Stmt
+	selectRoomVisibilitiesStmt           *sql.Stmt
+	selectMembershipEventsStmt           *sql.Stmt
+	selectTopologicalEventStmt           *sql.Stmt
+	selectTopologicalMembershipEventStmt *sql.Stmt
 }
 
 func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
@@ -200,6 +225,10 @@ func NewPostgresEventsTable(db *sql.DB) (tables.Events, error) {
 		{&s.selectContextEventStmt, selectContextEventSQL},
 		{&s.selectContextBeforeEventStmt, selectContextBeforeEventSQL},
 		{&s.selectContextAfterEventStmt, selectContextAfterEventSQL},
+		{&s.selectRoomVisibilitiesStmt, selectRoomVisibilitiesSQL},
+		{&s.selectMembershipEventsStmt, selectMembershipEventsSQL},
+		{&s.selectTopologicalEventStmt, selectTopologicalEventSQL},
+		{&s.selectTopologicalMembershipEventStmt, selectTopologicalMembershipEventSQL},
 	}.Prepare(db)
 }
 
@@ -578,6 +607,83 @@ func (s *outputRoomEventsStatements) SelectContextAfterEvent(
 	}
 
 	return lastID, evts, rows.Err()
+}
+
+func (s *outputRoomEventsStatements) SelectRoomVisibilities(ctx context.Context, txn *sql.Tx, roomID string) ([]gomatrixserverlib.HeaderedEvent, error) {
+	rows, err := sqlutil.TxStmtContext(ctx, txn, s.selectRoomVisibilitiesStmt).QueryContext(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
+	var (
+		res        []gomatrixserverlib.HeaderedEvent
+		eventBytes []byte
+		event      gomatrixserverlib.HeaderedEvent
+	)
+	for rows.Next() {
+		if err = rows.Scan(&eventBytes); err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal(eventBytes, &event); err != nil {
+			return nil, err
+		}
+		res = append(res, event)
+	}
+
+	return res, rows.Err()
+}
+
+func (s *outputRoomEventsStatements) SelectMembershipEventsForUser(ctx context.Context, txn *sql.Tx, roomID string, userID string) ([]gomatrixserverlib.HeaderedEvent, error) {
+	rows, err := sqlutil.TxStmtContext(ctx, txn, s.selectMembershipEventsStmt).QueryContext(ctx, roomID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer internal.CloseAndLogIfError(ctx, rows, "rows.close() failed")
+	var (
+		res        []gomatrixserverlib.HeaderedEvent
+		eventBytes []byte
+		event      gomatrixserverlib.HeaderedEvent
+	)
+	for rows.Next() {
+		if err = rows.Scan(&eventBytes); err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal(eventBytes, &event); err != nil {
+			return nil, err
+		}
+		res = append(res, event)
+	}
+
+	return res, rows.Err()
+}
+
+func (s *outputRoomEventsStatements) SelectTopologicalEvent(
+	ctx context.Context, txn *sql.Tx, topologicalPosition int, eventType, roomID string, userID *string,
+) (gomatrixserverlib.HeaderedEvent, types.TopologyToken, error) {
+	var (
+		eventBytes []byte
+		err        error
+		token      types.TopologyToken
+	)
+	if userID != nil {
+		err = sqlutil.TxStmtContext(ctx, txn, s.selectTopologicalMembershipEventStmt).
+			QueryRowContext(ctx, roomID, topologicalPosition, eventType, userID).
+			Scan(&eventBytes, &token.Depth, &token.PDUPosition)
+	} else {
+		err = sqlutil.TxStmtContext(ctx, txn, s.selectTopologicalEventStmt).
+			QueryRowContext(ctx, roomID, topologicalPosition, eventType).
+			Scan(&eventBytes, &token.Depth, &token.PDUPosition)
+	}
+	if err != nil {
+		return gomatrixserverlib.HeaderedEvent{}, types.TopologyToken{}, err
+	}
+
+	var res gomatrixserverlib.HeaderedEvent
+	if err = json.Unmarshal(eventBytes, &res); err != nil {
+		return gomatrixserverlib.HeaderedEvent{}, types.TopologyToken{}, err
+	}
+
+	return res, token, nil
 }
 
 func rowsToStreamEvents(rows *sql.Rows) ([]types.StreamEvent, error) {

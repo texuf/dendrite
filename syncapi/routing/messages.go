@@ -24,6 +24,7 @@ import (
 	"github.com/matrix-org/dendrite/internal/caching"
 	"github.com/matrix-org/dendrite/roomserver/api"
 	"github.com/matrix-org/dendrite/setup/config"
+	"github.com/matrix-org/dendrite/syncapi/internal"
 	"github.com/matrix-org/dendrite/syncapi/storage"
 	"github.com/matrix-org/dendrite/syncapi/sync"
 	"github.com/matrix-org/dendrite/syncapi/types"
@@ -224,6 +225,15 @@ func OnIncomingMessagesRequest(
 		}
 	}
 
+	clientEventsNew := []gomatrixserverlib.ClientEvent{}
+	for _, ev := range clientEvents {
+		logrus.Debugf("checking visibility for Event: %+v", ev)
+		if internal.RoomVisibilities(req.Context(), db, roomID, device.UserID, ev.EventID) {
+			clientEventsNew = append(clientEventsNew, ev)
+		}
+	}
+	logrus.Debugf("Events after filtering: %d vs %d", len(clientEvents), len(clientEventsNew))
+
 	util.GetLogger(req.Context()).WithFields(logrus.Fields{
 		"from":         from.String(),
 		"to":           to.String(),
@@ -234,7 +244,7 @@ func OnIncomingMessagesRequest(
 	}).Info("Responding")
 
 	res := messagesResp{
-		Chunk: clientEvents,
+		Chunk: clientEventsNew,
 		Start: start.String(),
 		End:   end.String(),
 		State: state,
@@ -331,7 +341,7 @@ func (r *messagesReq) retrieveEvents() (
 }
 
 func (r *messagesReq) filterHistoryVisible(events []*gomatrixserverlib.HeaderedEvent) []*gomatrixserverlib.HeaderedEvent {
-	// TODO FIXME: We don't fully implement history visibility yet. To avoid leaking events which the
+	// TODO FIXME: We don't fully implement history EventVisibility yet. To avoid leaking events which the
 	// user shouldn't see, we check the recent events and remove any prior to the join event of the user
 	// which is equiv to history_visibility: joined
 	joinEventIndex := -1
