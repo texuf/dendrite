@@ -105,13 +105,13 @@ func (r *Upgrader) performRoomUpgrade(
 		return "", pErr
 	}
 
-	// 5. Send the tombstone event to the old room (must do this before we set the new canonical_alias)
-	if pErr = r.sendHeaderedEvent(ctx, tombstoneEvent); pErr != nil {
+	// Send the setup events to the new room
+	if pErr = r.sendInitialEvents(ctx, evTime, userID, newRoomID, string(req.RoomVersion), eventsToMake); pErr != nil {
 		return "", pErr
 	}
 
-	// Send the setup events to the new room
-	if pErr = r.sendInitialEvents(ctx, evTime, userID, newRoomID, string(req.RoomVersion), eventsToMake); pErr != nil {
+	// 5. Send the tombstone event to the old room
+	if pErr = r.sendHeaderedEvent(ctx, tombstoneEvent); pErr != nil {
 		return "", pErr
 	}
 
@@ -509,7 +509,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 		err = builder.SetContent(e.Content)
 		if err != nil {
 			return &api.PerformError{
-				Msg: "builder.SetContent failed",
+				Msg: fmt.Sprintf("Failed to set content of new %q event: %s", builder.Type, err),
 			}
 		}
 		if i > 0 {
@@ -519,13 +519,13 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 		event, err = r.buildEvent(&builder, &authEvents, evTime, gomatrixserverlib.RoomVersion(newVersion))
 		if err != nil {
 			return &api.PerformError{
-				Msg: "buildEvent failed",
+				Msg: fmt.Sprintf("Failed to build new %q event: %s", builder.Type, err),
 			}
 		}
 
 		if err = gomatrixserverlib.Allowed(event, &authEvents); err != nil {
 			return &api.PerformError{
-				Msg: "gomatrixserverlib.Allowed failed",
+				Msg: fmt.Sprintf("Failed to auth new %q event: %s", builder.Type, err),
 			}
 		}
 
@@ -534,7 +534,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 		err = authEvents.AddEvent(event)
 		if err != nil {
 			return &api.PerformError{
-				Msg: "authEvents.AddEvent failed",
+				Msg: fmt.Sprintf("Failed to add new %q event to auth set: %s", builder.Type, err),
 			}
 		}
 	}
@@ -550,7 +550,7 @@ func (r *Upgrader) sendInitialEvents(ctx context.Context, evTime time.Time, user
 	}
 	if err = api.SendInputRoomEvents(ctx, r.URSAPI, inputs, false); err != nil {
 		return &api.PerformError{
-			Msg: "api.SendInputRoomEvents failed",
+			Msg: fmt.Sprintf("Failed to send new room %q to roomserver: %s", newRoomID, err),
 		}
 	}
 	return nil
