@@ -1069,8 +1069,8 @@ func (l *authEventLoader) loadAuthEvents(
 ) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
 	l.Lock()
 	defer l.Unlock()
-	authEvents := []types.Event{}
-	included := map[string]struct{}{}
+	authEvents := []types.Event{}     // our returned list
+	included := map[string]struct{}{} // dedupes authEvents above
 	queue := event.AuthEventIDs()
 	for i := 0; i < len(queue); i++ {
 		// Reuse the same underlying memory, since it reduces the
@@ -1105,6 +1105,9 @@ func (l *authEventLoader) loadAuthEvents(
 				return nil, nil, fmt.Errorf("v.db.EventsFromIDs: %w", err)
 			}
 			l.lookedUpEvents = append(l.lookedUpEvents, eventsFromDB...)
+			for _, event := range eventsFromDB {
+				eventMap[event.EventID()] = event
+			}
 		}
 
 		// Fill in the gaps with events that we already have in memory.
@@ -1118,8 +1121,9 @@ func (l *authEventLoader) loadAuthEvents(
 		// events to look up on the next iteration.
 		add := map[string]struct{}{}
 		for _, event := range l.lookedUpEvents {
-			eventMap[event.EventID()] = event
 			authEvents = append(authEvents, event)
+			included[event.EventID()] = struct{}{}
+
 			for _, authEventID := range event.AuthEventIDs() {
 				if _, ok := included[authEventID]; ok {
 					continue
