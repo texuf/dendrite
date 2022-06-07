@@ -918,19 +918,29 @@ func (v *StateResolution) resolveConflictsV2(
 	// Look through all of the auth events that we've been given and work out if
 	// there are any events which don't appear in all of the auth sets. If they
 	// don't then we add them to the auth difference.
-	for _, event := range authEvents {
-		if !isInAllAuthLists(event) {
-			authDifference = append(authDifference, event)
+	func() {
+		span, _ := opentracing.StartSpanFromContext(ctx, "isInAllAuthLists")
+		defer span.Finish()
+
+		for _, event := range authEvents {
+			if !isInAllAuthLists(event) {
+				authDifference = append(authDifference, event)
+			}
 		}
-	}
+	}()
 
 	// Resolve the conflicts.
-	resolvedEvents := gomatrixserverlib.ResolveStateConflictsV2(
-		conflictedEvents,
-		nonConflictedEvents,
-		authEvents,
-		authDifference,
-	)
+	resolvedEvents := func() []*gomatrixserverlib.Event {
+		span, _ := opentracing.StartSpanFromContext(ctx, "gomatrixserverlib.ResolveStateConflictsV2")
+		defer span.Finish()
+
+		return gomatrixserverlib.ResolveStateConflictsV2(
+			conflictedEvents,
+			nonConflictedEvents,
+			authEvents,
+			authDifference,
+		)
+	}()
 
 	// Map from the full events back to numeric state entries.
 	for _, resolvedEvent := range resolvedEvents {
