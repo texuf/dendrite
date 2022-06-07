@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/matrix-org/util"
@@ -1045,42 +1046,82 @@ func (v *StateResolution) loadStateEvents(
 	return result, eventIDMap, nil
 }
 
+type authEventLoader struct {
+	sync.Mutex
+	v              *StateResolution
+	lookupFromDB   []string      // scratch space
+	lookupFromMem  []string      // scratch space
+	lookedUpEvents []types.Event // scratch space
+	eventMap       map[string]types.Event
+}
+
 // loadAuthEvents loads all of the auth events for a given event recursively,
 // along with a map that contains state entries for all of the auth events.
-func (v *StateResolution) loadAuthEvents(
+func (l *authEventLoader) loadAuthEvents(
 	ctx context.Context, event *gomatrixserverlib.Event, eventMap map[string]types.Event,
 ) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
-	var lookup []string
-	var authEvents []types.Event
+	l.Lock()
+	defer l.Unlock()
+	authEvents := []types.Event{}
+	included := map[string]struct{}{}
 	queue := event.AuthEventIDs()
 	for i := 0; i < len(queue); i++ {
-		lookup = lookup[:0]
+		// Reuse the same underlying memory, since it reduces the
+		// amount of allocations we make the more times we call
+		// loadAuthEvents.
+		l.lookupFromDB = l.lookupFromDB[:0]
+		l.lookupFromMem = l.lookupFromMem[:0]
+		l.lookedUpEvents = l.lookedUpEvents[:0]
+
+		// Separate out the list of events in the queue based on if
+		// we think we already know the event in memory or not.
 		for _, authEventID := range queue {
-			if _, ok := eventMap[authEventID]; ok {
+			if _, ok := included[authEventID]; ok {
 				continue
 			}
-			lookup = append(lookup, authEventID)
+			if _, ok := eventMap[authEventID]; ok {
+				l.lookupFromMem = append(l.lookupFromMem, authEventID)
+			} else {
+				l.lookupFromDB = append(l.lookupFromDB, authEventID)
+			}
 		}
-		if len(lookup) == 0 {
+		// If there's nothing to do, stop here.
+		if len(l.lookupFromDB) == 0 && len(l.lookupFromMem) == 0 {
 			break
 		}
-		events, err := v.db.EventsFromIDs(ctx, lookup)
-		if err != nil {
-			return nil, nil, fmt.Errorf("v.db.EventsFromIDs: %w", err)
+
+		// If we need to get events from the database, go and fetch
+		// those now.
+		if len(l.lookupFromDB) > 0 {
+			eventsFromDB, err := l.v.db.EventsFromIDs(ctx, l.lookupFromDB)
+			if err != nil {
+				return nil, nil, fmt.Errorf("v.db.EventsFromIDs: %w", err)
+			}
+			l.lookedUpEvents = append(l.lookedUpEvents, eventsFromDB...)
 		}
+
+		// Fill in the gaps with events that we already have in memory.
+		if len(l.lookupFromMem) > 0 {
+			for _, eventID := range l.lookupFromMem {
+				l.lookedUpEvents = append(l.lookedUpEvents, eventMap[eventID])
+			}
+		}
+
+		// From the events that we've retrieved, work out which auth
+		// events to look up on the next iteration.
 		add := map[string]struct{}{}
-		for _, event := range events {
+		for _, event := range l.lookedUpEvents {
 			eventMap[event.EventID()] = event
 			authEvents = append(authEvents, event)
 			for _, authEventID := range event.AuthEventIDs() {
-				if _, ok := eventMap[authEventID]; ok {
+				if _, ok := included[authEventID]; ok {
 					continue
 				}
 				add[authEventID] = struct{}{}
 			}
-			for authEventID := range add {
-				queue = append(queue, authEventID)
-			}
+		}
+		for authEventID := range add {
+			queue = append(queue, authEventID)
 		}
 	}
 	authEventTypes := map[string]struct{}{}
@@ -1097,11 +1138,11 @@ func (v *StateResolution) loadAuthEvents(
 	for eventStateKey := range authEventStateKeys {
 		lookupAuthEventStateKeys = append(lookupAuthEventStateKeys, eventStateKey)
 	}
-	eventTypes, err := v.db.EventTypeNIDs(ctx, lookupAuthEventTypes)
+	eventTypes, err := l.v.db.EventTypeNIDs(ctx, lookupAuthEventTypes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("v.db.EventTypeNIDs: %w", err)
 	}
-	eventStateKeys, err := v.db.EventStateKeyNIDs(ctx, lookupAuthEventStateKeys)
+	eventStateKeys, err := l.v.db.EventStateKeyNIDs(ctx, lookupAuthEventStateKeys)
 	if err != nil {
 		return nil, nil, fmt.Errorf("v.db.EventStateKeyNIDs: %w", err)
 	}
