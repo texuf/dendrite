@@ -863,6 +863,7 @@ func (v *StateResolution) resolveConflictsV2(
 	authEvents := make([]*gomatrixserverlib.Event, 0, estimate*3)
 	gotAuthEvents := make(map[string]struct{}, estimate*3)
 	authDifference := make([]*gomatrixserverlib.Event, 0, estimate)
+	knownAuthEvents := make(map[string]types.Event, estimate*3)
 
 	// For each conflicted event, let's try and get the needed auth events.
 	for _, conflictedEvent := range conflictedEvents {
@@ -871,7 +872,7 @@ func (v *StateResolution) resolveConflictsV2(
 
 		// Store the newly found auth events in the auth set for this event.
 		var authEventMap map[string]types.StateEntry
-		authSets[key], authEventMap, err = v.loadAuthEvents(ctx, conflictedEvent)
+		authSets[key], authEventMap, err = v.loadAuthEvents(ctx, conflictedEvent, knownAuthEvents)
 		if err != nil {
 			return nil, err
 		}
@@ -1039,12 +1040,11 @@ func (v *StateResolution) loadStateEvents(
 // loadAuthEvents loads all of the auth events for a given event recursively,
 // along with a map that contains state entries for all of the auth events.
 func (v *StateResolution) loadAuthEvents(
-	ctx context.Context, event *gomatrixserverlib.Event,
+	ctx context.Context, event *gomatrixserverlib.Event, eventMap map[string]types.Event,
 ) ([]*gomatrixserverlib.Event, map[string]types.StateEntry, error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "StateResolution.loadAuthEvents")
 	defer span.Finish()
 
-	eventMap := map[string]struct{}{}
 	var lookup []string
 	var authEvents []types.Event
 	queue := event.AuthEventIDs()
@@ -1065,7 +1065,7 @@ func (v *StateResolution) loadAuthEvents(
 		}
 		add := map[string]struct{}{}
 		for _, event := range events {
-			eventMap[event.EventID()] = struct{}{}
+			eventMap[event.EventID()] = event
 			authEvents = append(authEvents, event)
 			for _, authEventID := range event.AuthEventIDs() {
 				if _, ok := eventMap[authEventID]; ok {
