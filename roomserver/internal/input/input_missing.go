@@ -15,6 +15,7 @@ import (
 	"github.com/matrix-org/dendrite/roomserver/types"
 	"github.com/matrix-org/gomatrixserverlib"
 	"github.com/matrix-org/util"
+	"github.com/opentracing/opentracing-go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -59,6 +60,9 @@ type missingStateReq struct {
 func (t *missingStateReq) processEventWithMissingState(
 	ctx context.Context, e *gomatrixserverlib.Event, roomVersion gomatrixserverlib.RoomVersion,
 ) (*parsedRespState, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "processEventWithMissingState")
+	defer span.Finish()
+
 	// We are missing the previous events for this events.
 	// This means that there is a gap in our view of the history of the
 	// room. There two ways that we can handle such a gap:
