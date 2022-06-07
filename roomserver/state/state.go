@@ -871,13 +871,20 @@ func (v *StateResolution) resolveConflictsV2(
 		span, sctx := opentracing.StartSpanFromContext(ctx, "StateResolution.loadAuthEvents")
 		defer span.Finish()
 
+		loader := authEventLoader{
+			v:              v,
+			lookupFromDB:   make([]string, 0, len(conflictedEvents)*3),
+			lookupFromMem:  make([]string, 0, len(conflictedEvents)*3),
+			lookedUpEvents: make([]types.Event, 0, len(conflictedEvents)*3),
+			eventMap:       map[string]types.Event{},
+		}
 		for _, conflictedEvent := range conflictedEvents {
 			// Work out which auth events we need to load.
 			key := conflictedEvent.EventID()
 
 			// Store the newly found auth events in the auth set for this event.
 			var authEventMap map[string]types.StateEntry
-			authSets[key], authEventMap, err = v.loadAuthEvents(sctx, conflictedEvent, knownAuthEvents)
+			authSets[key], authEventMap, err = loader.loadAuthEvents(sctx, conflictedEvent, knownAuthEvents)
 			if err != nil {
 				return err
 			}
