@@ -205,12 +205,7 @@ type txnFederationClient interface {
 }
 
 func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.RespSend, *util.JSONResponse) {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		t.processEDUs(ctx)
-	}()
+	go t.processEDUs()
 
 	results := make(map[string]gomatrixserverlib.PDUResult)
 	roomVersions := make(map[string]gomatrixserverlib.RoomVersion)
@@ -301,13 +296,42 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 		pduCountTotal.WithLabelValues("success").Inc()
 	}
 
-	wg.Wait()
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
 
-// nolint:gocyclo
-func (t *txnReq) processEDUs(ctx context.Context) {
+func (t *txnReq) processEDUs() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	wg := &sync.WaitGroup{}
+	sortedByType := map[string][]*gomatrixserverlib.EDU{}
 	for _, e := range t.EDUs {
+		sortedByType[e.Type] = append(sortedByType[e.Type], &e)
+	}
+	for eduType, q := range sortedByType {
+		switch eduType {
+		case gomatrixserverlib.MTyping:
+			go t.processTypingEvents(ctx, q, wg)
+		case gomatrixserverlib.MDirectToDevice:
+			go t.processSendToDeviceEvents(ctx, q, wg)
+		case gomatrixserverlib.MDeviceListUpdate:
+			go t.processDeviceListUpdates(ctx, q, wg)
+		case gomatrixserverlib.MReceipt:
+			go t.processReceiptEvents(ctx, q, wg)
+		case types.MSigningKeyUpdate:
+			go t.processSigningKeyUpdates(ctx, q, wg)
+		case gomatrixserverlib.MPresence:
+			go t.processPresenceEvents(ctx, q, wg)
+		default:
+			continue
+		}
+		wg.Add(1)
+	}
+	wg.Wait()
+}
+
+func (t *txnReq) processTypingEvents(ctx context.Context, edus []*gomatrixserverlib.EDU, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for _, e := range edus {
 		eduCountTotal.Inc()
 		switch e.Type {
 		case gomatrixserverlib.MTyping:
@@ -331,83 +355,106 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 			if err := t.producer.SendTyping(ctx, typingPayload.UserID, typingPayload.RoomID, typingPayload.Typing, 30*1000); err != nil {
 				util.GetLogger(ctx).WithError(err).Error("Failed to send typing event to JetStream")
 			}
-		case gomatrixserverlib.MDirectToDevice:
-			// https://matrix.org/docs/spec/server_server/r0.1.3#m-direct-to-device-schema
-			var directPayload gomatrixserverlib.ToDeviceMessage
-			if err := json.Unmarshal(e.Content, &directPayload); err != nil {
-				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal send-to-device events")
-				continue
-			}
-			if _, serverName, err := gomatrixserverlib.SplitID('@', directPayload.Sender); err != nil {
-				continue
-			} else if serverName == t.ourServerName {
-				continue
-			} else if serverName != t.Origin {
-				continue
-			}
-			for userID, byUser := range directPayload.Messages {
-				for deviceID, message := range byUser {
-					// TODO: check that the user and the device actually exist here
-					if err := t.producer.SendToDevice(ctx, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
-						util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
-							"sender":    directPayload.Sender,
-							"user_id":   userID,
-							"device_id": deviceID,
-						}).Error("Failed to send send-to-device event to JetStream")
-					}
-				}
-			}
-		case gomatrixserverlib.MDeviceListUpdate:
-			t.processDeviceListUpdate(ctx, e)
-		case gomatrixserverlib.MReceipt:
-			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
-			payload := map[string]types.FederationReceiptMRead{}
+		}
+	}
+}
 
-			if err := json.Unmarshal(e.Content, &payload); err != nil {
-				util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal receipt event")
-				continue
+func (t *txnReq) processSendToDeviceEvents(ctx context.Context, edus []*gomatrixserverlib.EDU, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for _, e := range edus {
+		// https://matrix.org/docs/spec/server_server/r0.1.3#m-direct-to-device-schema
+		var directPayload gomatrixserverlib.ToDeviceMessage
+		if err := json.Unmarshal(e.Content, &directPayload); err != nil {
+			util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal send-to-device events")
+			continue
+		}
+		if _, serverName, err := gomatrixserverlib.SplitID('@', directPayload.Sender); err != nil {
+			continue
+		} else if serverName == t.ourServerName {
+			continue
+		} else if serverName != t.Origin {
+			continue
+		}
+		for userID, byUser := range directPayload.Messages {
+			for deviceID, message := range byUser {
+				// TODO: check that the user and the device actually exist here
+				if err := t.producer.SendToDevice(ctx, directPayload.Sender, userID, deviceID, directPayload.Type, message); err != nil {
+					util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
+						"sender":    directPayload.Sender,
+						"user_id":   userID,
+						"device_id": deviceID,
+					}).Error("Failed to send send-to-device event to JetStream")
+				}
 			}
+		}
+	}
+}
 
-			for roomID, receipt := range payload {
-				for userID, mread := range receipt.User {
-					_, domain, err := gomatrixserverlib.SplitID('@', userID)
-					if err != nil {
-						util.GetLogger(ctx).WithError(err).Debug("Failed to split domain from receipt event sender")
-						continue
-					}
-					if t.Origin != domain {
-						util.GetLogger(ctx).Debugf("Dropping receipt event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
-						continue
-					}
-					if err := t.processReceiptEvent(ctx, userID, roomID, "m.read", mread.Data.TS, mread.EventIDs); err != nil {
-						util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
-							"sender":  t.Origin,
-							"user_id": userID,
-							"room_id": roomID,
-							"events":  mread.EventIDs,
-						}).Error("Failed to send receipt event to JetStream")
-						continue
-					}
+func (t *txnReq) processDeviceListUpdates(ctx context.Context, edus []*gomatrixserverlib.EDU, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for _, e := range edus {
+		t.processDeviceListUpdate(ctx, e)
+	}
+}
+
+func (t *txnReq) processReceiptEvents(ctx context.Context, edus []*gomatrixserverlib.EDU, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for _, e := range edus {
+		// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
+		payload := map[string]types.FederationReceiptMRead{}
+
+		if err := json.Unmarshal(e.Content, &payload); err != nil {
+			util.GetLogger(ctx).WithError(err).Debug("Failed to unmarshal receipt event")
+			continue
+		}
+
+		for roomID, receipt := range payload {
+			for userID, mread := range receipt.User {
+				_, domain, err := gomatrixserverlib.SplitID('@', userID)
+				if err != nil {
+					util.GetLogger(ctx).WithError(err).Debug("Failed to split domain from receipt event sender")
+					continue
+				}
+				if t.Origin != domain {
+					util.GetLogger(ctx).Debugf("Dropping receipt event where sender domain (%q) doesn't match origin (%q)", domain, t.Origin)
+					continue
+				}
+				if err := t.processReceiptEvent(ctx, userID, roomID, "m.read", mread.Data.TS, mread.EventIDs); err != nil {
+					util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
+						"sender":  t.Origin,
+						"user_id": userID,
+						"room_id": roomID,
+						"events":  mread.EventIDs,
+					}).Error("Failed to send receipt event to JetStream")
+					continue
 				}
 			}
-		case types.MSigningKeyUpdate:
-			if err := t.processSigningKeyUpdate(ctx, e); err != nil {
-				logrus.WithError(err).Errorf("Failed to process signing key update")
+		}
+	}
+}
+
+func (t *txnReq) processSigningKeyUpdates(ctx context.Context, edus []*gomatrixserverlib.EDU, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for _, e := range edus {
+		if err := t.processSigningKeyUpdate(ctx, e); err != nil {
+			logrus.WithError(err).Errorf("Failed to process signing key update")
+		}
+	}
+}
+
+func (t *txnReq) processPresenceEvents(ctx context.Context, edus []*gomatrixserverlib.EDU, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for _, e := range edus {
+		if t.inboundPresenceEnabled {
+			if err := t.processPresence(ctx, e); err != nil {
+				logrus.WithError(err).Errorf("Failed to process presence update")
 			}
-		case gomatrixserverlib.MPresence:
-			if t.inboundPresenceEnabled {
-				if err := t.processPresence(ctx, e); err != nil {
-					logrus.WithError(err).Errorf("Failed to process presence update")
-				}
-			}
-		default:
-			util.GetLogger(ctx).WithField("type", e.Type).Debug("Unhandled EDU")
 		}
 	}
 }
 
 // processPresence handles m.receipt events
-func (t *txnReq) processPresence(ctx context.Context, e gomatrixserverlib.EDU) error {
+func (t *txnReq) processPresence(ctx context.Context, e *gomatrixserverlib.EDU) error {
 	payload := types.Presence{}
 	if err := json.Unmarshal(e.Content, &payload); err != nil {
 		return err
@@ -431,7 +478,7 @@ func (t *txnReq) processPresence(ctx context.Context, e gomatrixserverlib.EDU) e
 	return nil
 }
 
-func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e gomatrixserverlib.EDU) error {
+func (t *txnReq) processSigningKeyUpdate(ctx context.Context, e *gomatrixserverlib.EDU) error {
 	var updatePayload keyapi.CrossSigningKeyUpdate
 	if err := json.Unmarshal(e.Content, &updatePayload); err != nil {
 		util.GetLogger(ctx).WithError(err).WithFields(logrus.Fields{
@@ -488,7 +535,7 @@ func (t *txnReq) processReceiptEvent(ctx context.Context,
 	return nil
 }
 
-func (t *txnReq) processDeviceListUpdate(ctx context.Context, e gomatrixserverlib.EDU) {
+func (t *txnReq) processDeviceListUpdate(ctx context.Context, e *gomatrixserverlib.EDU) {
 	var payload gomatrixserverlib.DeviceListUpdateEvent
 	if err := json.Unmarshal(e.Content, &payload); err != nil {
 		util.GetLogger(ctx).WithError(err).Error("Failed to unmarshal device list update event")
