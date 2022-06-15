@@ -358,7 +358,7 @@ func (t *txnReq) processEDUs(ctx context.Context) {
 				}
 			}
 		case gomatrixserverlib.MDeviceListUpdate:
-			t.processDeviceListUpdate(ctx, e)
+			go t.processDeviceListUpdate(ctx, e)
 		case gomatrixserverlib.MReceipt:
 			// https://matrix.org/docs/spec/server_server/r0.1.4#receipts
 			payload := map[string]types.FederationReceiptMRead{}
