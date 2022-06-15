@@ -301,7 +301,7 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 
 func (t *txnReq) processEDUs() {
 	wg := &sync.WaitGroup{}
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	sortedByType := map[string][]*gomatrixserverlib.EDU{}
 	for _, e := range t.EDUs {
 		sortedByType[e.Type] = append(sortedByType[e.Type], &e)
@@ -326,6 +326,7 @@ func (t *txnReq) processEDUs() {
 		wg.Add(1)
 	}
 	wg.Wait()
+	cancel()
 }
 
 func (t *txnReq) processTypingEvents(ctx context.Context, edus []*gomatrixserverlib.EDU, wg *sync.WaitGroup) {
