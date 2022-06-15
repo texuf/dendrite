@@ -205,7 +205,8 @@ type txnFederationClient interface {
 }
 
 func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.RespSend, *util.JSONResponse) {
-	go t.processEDUs()
+	wg := &sync.WaitGroup{}
+	go t.processEDUs(ctx, wg)
 
 	results := make(map[string]gomatrixserverlib.PDUResult)
 	roomVersions := make(map[string]gomatrixserverlib.RoomVersion)
@@ -296,13 +297,11 @@ func (t *txnReq) processTransaction(ctx context.Context) (*gomatrixserverlib.Res
 		pduCountTotal.WithLabelValues("success").Inc()
 	}
 
+	wg.Wait()
 	return &gomatrixserverlib.RespSend{PDUs: results}, nil
 }
 
-func (t *txnReq) processEDUs() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-	defer cancel()
-	wg := &sync.WaitGroup{}
+func (t *txnReq) processEDUs(ctx context.Context, wg *sync.WaitGroup) {
 	sortedByType := map[string][]*gomatrixserverlib.EDU{}
 	for _, e := range t.EDUs {
 		sortedByType[e.Type] = append(sortedByType[e.Type], &e)
@@ -326,7 +325,6 @@ func (t *txnReq) processEDUs() {
 		}
 		wg.Add(1)
 	}
-	wg.Wait()
 }
 
 func (t *txnReq) processTypingEvents(ctx context.Context, edus []*gomatrixserverlib.EDU, wg *sync.WaitGroup) {
