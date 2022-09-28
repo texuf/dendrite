@@ -54,5 +54,13 @@ func (p *NotificationDataStreamProvider) IncrementalSync(
 		req.Response.Rooms.Join[roomID] = jr
 	}
 
+	for roomID, counts := range countsByRoom {
+		unreadNotificationsData := *types.NewUnreadNotificationsResponse()
+
+		unreadNotificationsData.HighlightCount = counts.UnreadHighlightCount
+		unreadNotificationsData.NotificationCount = counts.UnreadNotificationCount
+		req.Response.Rooms.UnreadNotifications[roomID] = unreadNotificationsData
+	}
+
 	return p.LatestPosition(ctx)
 }
