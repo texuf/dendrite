@@ -767,6 +767,7 @@ func (d *Database) GetStateDeltas(
 		}
 	}
 
+	var membershipPositions = make(map[string]types.StreamPosition)
 	// handle newly joined rooms and non-joined rooms
 	newlyJoinedRooms := make(map[string]bool, len(state))
 	for roomID, stateStreamEvents := range state {
@@ -782,6 +783,7 @@ func (d *Database) GetStateDeltas(
 						}
 						return nil, nil, err
 					}
+					membershipPositions[roomID] = ev.StreamPosition
 					state[roomID] = s
 					newlyJoinedRooms[roomID] = true
 					continue // we'll add this room in when we do joined rooms
@@ -802,6 +804,7 @@ func (d *Database) GetStateDeltas(
 	for _, joinedRoomID := range joinedRoomIDs {
 		deltas = append(deltas, types.StateDelta{
 			Membership:  gomatrixserverlib.Join,
+			MembershipPos: membershipPositions[joinedRoomID],
 			StateEvents: d.StreamEventsToEvents(device, state[joinedRoomID]),
 			RoomID:      joinedRoomID,
 			NewlyJoined: newlyJoinedRooms[joinedRoomID],
